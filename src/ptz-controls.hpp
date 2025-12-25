@@ -10,6 +10,9 @@
 #include <QTimer>
 #include <obs.hpp>
 #include <QDockWidget>
+#include <QStyledItemDelegate>
+#include <QCheckBox>
+#include <QLabel>
 #include "imported/qjoysticks/QJoysticks.h"
 #include "touch-control.hpp"
 #include "ptz-device.hpp"
@@ -144,4 +147,41 @@ public:
 	void setDisableLiveMoves(bool enable);
 	bool liveMovesDisabled() { return live_moves_disabled; };
 	static PTZControls *getInstance() { return instance; };
+
+#ifdef ENABLE_WEBSOCKET
+	// WebSocket vendor request handlers (thread-safe)
+	Q_INVOKABLE bool websocketMove(QString &device_name_out, QString &error_out,
+			   double pan, double tilt, double zoom);
+	Q_INVOKABLE bool websocketStop(QString &device_name_out, QString &error_out);
+	Q_INVOKABLE bool websocketGetActiveDevice(uint32_t &device_id_out,
+				       QString &device_name_out,
+				       QString &error_out);
+#endif
+};
+
+class PTZDeviceListDelegate : public QStyledItemDelegate {
+	Q_OBJECT
+
+public:
+	PTZDeviceListDelegate(QObject *parent);
+	virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+	virtual void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override;
+};
+
+class PTZDeviceListItem : public QFrame {
+	Q_OBJECT
+
+public:
+	PTZDeviceListItem(PTZDevice *ptz_);
+	bool isLocked() { return lock ? lock->isChecked() && lock->isVisible() : false; };
+	void update();
+	virtual QSize sizeHint() const;
+
+private:
+	QSpacerItem *spacer = nullptr;
+	QCheckBox *lock = nullptr;
+	QHBoxLayout *boxLayout = nullptr;
+	QLabel *label = nullptr;
+
+	PTZDevice *ptz;
 };

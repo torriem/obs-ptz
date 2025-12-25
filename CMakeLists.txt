@@ -122,6 +122,12 @@ if(ENABLE_JOYSTICK)
   endif()
 endif()
 
+option(ENABLE_WEBSOCKET "Enable OBS WebSocket vendor request support" ON)
+if(ENABLE_WEBSOCKET)
+  add_compile_definitions(ENABLE_WEBSOCKET)
+  target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/ptz-websocket.cpp src/ptz-websocket.h)
+endif()
+
 set_target_properties(
   ${CMAKE_PROJECT_NAME}
   PROPERTIES AUTOMOC ON

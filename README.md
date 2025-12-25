@@ -31,6 +31,13 @@ Features:
   - VISCA over TCP (PTZ Optics and others)
   - Pelco-P
   - Pelco-D
+- torriem@gmail.com added experimental websocket CallVendorRequest api exposing PTZ control of cameras to clients
+  - vendor is "obs-ptz"
+  - supported commands:
+    - ptz_move with parameters QString device_name, double pan, double, tilt, double zoom
+    - ptz_stop QString device_name
+    - ptz_get_active_device
+    - modified OBS Blade client
 
 ONVIF support is in the codebase, but is experimental and disabled for now.
 

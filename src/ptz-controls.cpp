@@ -920,3 +920,103 @@ void PTZControls::on_actionDisableLiveMoves_toggled(bool checked)
 	ui->movementControlsWidget->setEnabled(!checked);
 	ui->presetListView->setEnabled(!checked);
 }
+
+#ifdef ENABLE_WEBSOCKET
+/* WebSocket vendor request handlers (thread-safe, called from WebSocket thread via QMetaObject::invokeMethod) */
+
+bool PTZControls::websocketMove(QString &device_name_out, QString &error_out,
+				double pan, double tilt, double zoom)
+{
+	// This executes on main thread via QMetaObject::invokeMethod
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	ptz->pantilt(pan, tilt);
+	ptz->zoom(zoom);
+	device_name_out = ptz->objectName();
+	return true;
+}
+
+bool PTZControls::websocketStop(QString &device_name_out, QString &error_out)
+{
+	return websocketMove(device_name_out, error_out, 0.0, 0.0, 0.0);
+}
+
+bool PTZControls::websocketGetActiveDevice(uint32_t &device_id_out,
+					    QString &device_name_out,
+					    QString &error_out)
+{
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	device_id_out = ptz->getId();
+	device_name_out = ptz->objectName();
+	return true;
+}
+#endif
+
+PTZDeviceListDelegate::PTZDeviceListDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
+
+QSize PTZDeviceListDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+{
+	QListView *tree = qobject_cast<QListView *>(parent());
+	QWidget *item = tree->indexWidget(index);
+	if (item)
+		return item->sizeHint();
+
+	return QStyledItemDelegate::sizeHint(option, index);
+}
+
+void PTZDeviceListDelegate::initStyleOption(QStyleOptionViewItem *option, const QModelIndex &) const
+{
+	option->text = QString();
+}
+
+PTZDeviceListItem::PTZDeviceListItem(PTZDevice *ptz_) : ptz(ptz_)
+{
+	setAttribute(Qt::WA_TranslucentBackground);
+	lock = new QCheckBox();
+	lock->setProperty("class", "checkbox-icon indicator-lock");
+	lock->setChecked(false); // isLive() not available in this version
+	lock->setAccessibleName(obs_module_text("PTZ.Dock.Lock.Name"));
+	lock->setAccessibleDescription(obs_module_text("PTZ.Dock.Lock.Description"));
+
+	label = new QLabel(ptz->objectName());
+	label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+
+	boxLayout = new QHBoxLayout();
+	boxLayout->setContentsMargins(0, 0, 0, 0);
+	boxLayout->setSpacing(0);
+	boxLayout->addWidget(label);
+	boxLayout->addWidget(lock);
+	setLayout(boxLayout);
+
+	connect(lock, SIGNAL(clicked(bool)), PTZControls::getInstance(), SLOT(updateMoveControls()));
+
+	update();
+}
+
+QSize PTZDeviceListItem::sizeHint() const
+{
+	// The lock may be hidden, so account for it's size manually
+	return QFrame::sizeHint().expandedTo(lock->sizeHint());
+}
+
+void PTZDeviceListItem::update()
+{
+	bool is_live = obs_frontend_preview_program_mode_active() && PTZControls::getInstance()->liveMovesDisabled()
+			       ? false // isLive() not available in this version
+			       : false;
+	// When a camera becomes live, start with it locked
+	if (lock->isVisible() == false && is_live)
+		lock->setChecked(true);
+	if (label->text() != ptz->objectName())
+		label->setText(ptz->objectName());
+	lock->setVisible(is_live);
+}

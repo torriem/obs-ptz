@@ -24,11 +24,26 @@ bool obs_module_load()
 	ptz_load_action_source();
 	ptz_load_controls();
 	ptz_load_settings();
+#ifdef ENABLE_WEBSOCKET
+	blog(LOG_INFO, "Attempting to load websocket support...");
+	ptz_load_websocket();
+#endif
 	return true;
 }
 
+#ifdef ENABLE_WEBSOCKET
+void obs_module_post_load()
+{
+	blog(LOG_INFO, "obs_module_post_load() called, loading websocket...");
+	ptz_load_websocket();
+}
+#endif
+
 void obs_module_unload()
 {
+#ifdef ENABLE_WEBSOCKET
+	ptz_unload_websocket();
+#endif
 	ptz_unload_devices();
 	blog(LOG_INFO, "plugin unloaded");
 }
