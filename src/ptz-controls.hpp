@@ -156,6 +156,14 @@ public:
 	Q_INVOKABLE bool websocketGetActiveDevice(uint32_t &device_id_out,
 				       QString &device_name_out,
 				       QString &error_out);
+	Q_INVOKABLE bool websocketGetPresets(obs_data_array_t *presets_out,
+					      QString &error_out);
+	Q_INVOKABLE bool websocketRecallPreset(int preset_id,
+						QString &device_name_out,
+						QString &error_out);
+	Q_INVOKABLE bool websocketSetPreset(int preset_id,
+					     QString &device_name_out,
+					     QString &error_out);
 #endif
 };
 

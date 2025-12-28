@@ -151,6 +151,145 @@ static void ptz_get_active_device_cb(obs_data_t *request_data,
 	}
 }
 
+/* Vendor request: ptz_get_presets
+ * Returns a list of all PTZ presets for the active device
+ */
+static void ptz_get_presets_cb(obs_data_t *request_data,
+			       obs_data_t *response_data,
+			       void *priv_data)
+{
+	UNUSED_PARAMETER(request_data);
+	UNUSED_PARAMETER(priv_data);
+
+	QString error_msg;
+	bool success = false;
+	obs_data_array_t *presets = obs_data_array_create();
+
+	PTZControls *controls = PTZControls::getInstance();
+	if (controls) {
+		QMetaObject::invokeMethod(controls, "websocketGetPresets",
+					  Qt::BlockingQueuedConnection,
+					  Q_RETURN_ARG(bool, success),
+					  Q_ARG(obs_data_array_t *, presets),
+					  Q_ARG(QString&, error_msg));
+	} else {
+		error_msg = "PTZ Controls not initialized";
+	}
+
+	obs_data_set_bool(response_data, "success", success);
+	if (success) {
+		obs_data_set_array(response_data, "presets", presets);
+	} else {
+		obs_data_set_string(response_data, "message",
+				    QT_TO_UTF8(error_msg));
+	}
+
+	obs_data_array_release(presets);
+
+	blog(LOG_DEBUG, "[obs-ptz-websocket] ptz_get_presets -> %s",
+	     success ? "success" : "failed");
+}
+
+/* Vendor request: ptz_recall_preset
+ * Recalls a PTZ preset by ID
+ */
+static void ptz_recall_preset_cb(obs_data_t *request_data,
+				 obs_data_t *response_data,
+				 void *priv_data)
+{
+	UNUSED_PARAMETER(priv_data);
+
+	// Extract preset ID from request
+	if (!obs_data_has_user_value(request_data, "preset_id")) {
+		obs_data_set_bool(response_data, "success", false);
+		obs_data_set_string(response_data, "message",
+				    "Missing required parameter: preset_id");
+		return;
+	}
+
+	int preset_id = (int)obs_data_get_int(request_data, "preset_id");
+
+	QString device_name;
+	QString error_msg;
+	bool success = false;
+
+	PTZControls *controls = PTZControls::getInstance();
+	if (controls) {
+		QMetaObject::invokeMethod(
+			controls, "websocketRecallPreset",
+			Qt::BlockingQueuedConnection,
+			Q_RETURN_ARG(bool, success),
+			Q_ARG(int, preset_id),
+			Q_ARG(QString&, device_name),
+			Q_ARG(QString&, error_msg));
+	} else {
+		error_msg = "PTZ Controls not initialized";
+	}
+
+	obs_data_set_bool(response_data, "success", success);
+	if (success) {
+		obs_data_set_string(response_data, "device_name",
+				    QT_TO_UTF8(device_name));
+	} else {
+		obs_data_set_string(response_data, "message",
+				    QT_TO_UTF8(error_msg));
+	}
+
+	blog(LOG_DEBUG,
+	     "[obs-ptz-websocket] ptz_recall_preset: preset_id=%d -> %s",
+	     preset_id, success ? "success" : "failed");
+}
+
+/* Vendor request: ptz_set_preset
+ * Saves the current camera position to a PTZ preset by ID
+ */
+static void ptz_set_preset_cb(obs_data_t *request_data,
+			       obs_data_t *response_data,
+			       void *priv_data)
+{
+	UNUSED_PARAMETER(priv_data);
+
+	// Extract preset ID from request
+	if (!obs_data_has_user_value(request_data, "preset_id")) {
+		obs_data_set_bool(response_data, "success", false);
+		obs_data_set_string(response_data, "message",
+				    "Missing required parameter: preset_id");
+		return;
+	}
+
+	int preset_id = (int)obs_data_get_int(request_data, "preset_id");
+
+	QString device_name;
+	QString error_msg;
+	bool success = false;
+
+	PTZControls *controls = PTZControls::getInstance();
+	if (controls) {
+		QMetaObject::invokeMethod(
+			controls, "websocketSetPreset",
+			Qt::BlockingQueuedConnection,
+			Q_RETURN_ARG(bool, success),
+			Q_ARG(int, preset_id),
+			Q_ARG(QString&, device_name),
+			Q_ARG(QString&, error_msg));
+	} else {
+		error_msg = "PTZ Controls not initialized";
+	}
+
+	obs_data_set_bool(response_data, "success", success);
+	if (success) {
+		obs_data_set_string(response_data, "device_name",
+				    QT_TO_UTF8(device_name));
+	} else {
+		obs_data_set_string(response_data, "message",
+				    QT_TO_UTF8(error_msg));
+	}
+
+	blog(LOG_DEBUG,
+	     "[obs-ptz-websocket] ptz_set_preset: preset_id=%d -> %s",
+	     preset_id, success ? "success" : "failed");
+}
+
 void ptz_load_websocket(void)
 {
 	blog(LOG_INFO, "[obs-ptz-websocket] ptz_load_websocket() called");
@@ -187,8 +326,29 @@ void ptz_load_websocket(void)
 		     "[obs-ptz-websocket] Failed to register ptz_get_active_device request");
 	}
 
+	if (!obs_websocket_vendor_register_request(vendor, "ptz_get_presets",
+						   ptz_get_presets_cb,
+						   nullptr)) {
+		blog(LOG_ERROR,
+		     "[obs-ptz-websocket] Failed to register ptz_get_presets request");
+	}
+
+	if (!obs_websocket_vendor_register_request(vendor, "ptz_recall_preset",
+						   ptz_recall_preset_cb,
+						   nullptr)) {
+		blog(LOG_ERROR,
+		     "[obs-ptz-websocket] Failed to register ptz_recall_preset request");
+	}
+
+	if (!obs_websocket_vendor_register_request(vendor, "ptz_set_preset",
+						   ptz_set_preset_cb,
+						   nullptr)) {
+		blog(LOG_ERROR,
+		     "[obs-ptz-websocket] Failed to register ptz_set_preset request");
+	}
+
 	blog(LOG_INFO,
-	     "[obs-ptz-websocket] Vendor requests registered: ptz_move, ptz_stop, ptz_get_active_device");
+	     "[obs-ptz-websocket] Vendor requests registered: ptz_move, ptz_stop, ptz_get_active_device, ptz_get_presets, ptz_recall_preset, ptz_set_preset");
 }
 
 void ptz_unload_websocket(void)
@@ -198,6 +358,9 @@ void ptz_unload_websocket(void)
 		obs_websocket_vendor_unregister_request(vendor, "ptz_stop");
 		obs_websocket_vendor_unregister_request(vendor,
 							"ptz_get_active_device");
+		obs_websocket_vendor_unregister_request(vendor, "ptz_get_presets");
+		obs_websocket_vendor_unregister_request(vendor, "ptz_recall_preset");
+		obs_websocket_vendor_unregister_request(vendor, "ptz_set_preset");
 		vendor = nullptr;
 	}
 	blog(LOG_INFO, "[obs-ptz-websocket] Vendor unregistered");
