@@ -22,6 +22,11 @@ include(helpers)
 
 add_library(${CMAKE_PROJECT_NAME} MODULE)
 
+# Disable MSVCRT conflict warning on Windows
+if(WIN32)
+  target_link_options(${CMAKE_PROJECT_NAME} PRIVATE /ignore:4098)
+endif()
+
 find_package(libobs REQUIRED)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OBS::libobs)
 
@@ -119,6 +124,12 @@ if(ENABLE_JOYSTICK)
   add_subdirectory("${CMAKE_SOURCE_DIR}/shared/qjoysticks" "${CMAKE_BINARY_DIR}/shared/qjoysticks")
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE qjoysticks)
   add_compile_definitions(ENABLE_JOYSTICK SDL_SUPPORTED)
+endif()
+
+option(ENABLE_WEBSOCKET "Enable OBS WebSocket vendor request support" ON)
+if(ENABLE_WEBSOCKET)
+  add_compile_definitions(ENABLE_WEBSOCKET)
+  target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/ptz-websocket.cpp src/ptz-websocket.h src/obs-websocket-api.h)
 endif()
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})

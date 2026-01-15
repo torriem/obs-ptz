@@ -207,6 +207,25 @@ signals:
 	void autoselectEnabledChanged(bool enabled);
 	void liveMovesDisabledChanged(bool disabled);
 	void speedRampEnabledChanged(bool enabled);
+
+#ifdef ENABLE_WEBSOCKET
+public slots:
+	// WebSocket vendor request handlers (thread-safe)
+	bool websocketMove(QString &device_name_out, QString &error_out,
+			   double pan, double tilt, double zoom);
+	bool websocketStop(QString &device_name_out, QString &error_out);
+	bool websocketGetActiveDevice(uint32_t &device_id_out,
+				       QString &device_name_out,
+				       QString &error_out);
+	bool websocketGetPresets(obs_data_array_t *presets_out,
+					      QString &error_out);
+	bool websocketRecallPreset(int preset_id,
+						QString &device_name_out,
+						QString &error_out);
+	bool websocketSetPreset(int preset_id,
+					     QString &device_name_out,
+					     QString &error_out);
+#endif
 };
 
 class PTZDeviceListDelegate : public QStyledItemDelegate {

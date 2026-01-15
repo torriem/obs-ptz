@@ -26,6 +26,11 @@ extern void ptz_load_action_source(void);
 extern void ptz_load_controls(void);
 extern void ptz_load_settings(void);
 
+#ifdef ENABLE_WEBSOCKET
+extern void ptz_load_websocket(void);
+extern void ptz_unload_websocket(void);
+#endif
+
 extern obs_data_array_t *ptz_devices_get_config(void);
 extern obs_source_t *ptz_device_find_source_using_ptz_name(uint32_t device_id);
 extern void ptz_devices_set_config(obs_data_array_t *devices);

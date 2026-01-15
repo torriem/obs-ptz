@@ -1140,6 +1140,138 @@ void PTZControls::on_actionPresetClear_triggered()
 	ui->presetListView->model()->setData(index, "");
 }
 
+#ifdef ENABLE_WEBSOCKET
+/* WebSocket vendor request handlers (thread-safe, called from WebSocket thread via QMetaObject::invokeMethod) */
+
+bool PTZControls::websocketMove(QString &device_name_out, QString &error_out,
+				double pan, double tilt, double zoom)
+{
+	// This executes on main thread via QMetaObject::invokeMethod
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	ptz->pantilt(pan, tilt);
+	ptz->zoom(zoom);
+	device_name_out = ptz->objectName();
+	return true;
+}
+
+bool PTZControls::websocketStop(QString &device_name_out, QString &error_out)
+{
+	return websocketMove(device_name_out, error_out, 0.0, 0.0, 0.0);
+}
+
+bool PTZControls::websocketGetActiveDevice(uint32_t &device_id_out,
+					    QString &device_name_out,
+					    QString &error_out)
+{
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	device_id_out = ptz->getId();
+	device_name_out = ptz->objectName();
+	return true;
+}
+
+bool PTZControls::websocketGetPresets(obs_data_array_t *presets_out,
+				       QString &error_out)
+{
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	QAbstractListModel *preset_model = ptz->presetModel();
+	if (!preset_model) {
+		error_out = "Preset model not available";
+		return false;
+	}
+
+	// Build array of preset objects
+	int count = preset_model->rowCount();
+	for (int i = 0; i < count; i++) {
+		QModelIndex index = preset_model->index(i);
+		QString name = preset_model->data(index, Qt::DisplayRole).toString();
+
+		OBSDataAutoRelease preset = obs_data_create();
+		obs_data_set_int(preset, "id", i);
+		obs_data_set_string(preset, "name", QT_TO_UTF8(name));
+		obs_data_array_push_back(presets_out, preset);
+	}
+
+	return true;
+}
+
+bool PTZControls::websocketRecallPreset(int preset_id,
+					 QString &device_name_out,
+					 QString &error_out)
+{
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	QAbstractListModel *preset_model = ptz->presetModel();
+	if (!preset_model) {
+		error_out = "Preset model not available";
+		return false;
+	}
+
+	// Validate preset ID
+	int count = preset_model->rowCount();
+	if (preset_id < 0 || preset_id >= count) {
+		error_out = QString("Invalid preset ID: %1 (valid range: 0-%2)")
+				    .arg(preset_id)
+				    .arg(count - 1);
+		return false;
+	}
+
+	// Recall the preset
+	ptz->memory_recall(preset_id);
+	device_name_out = ptz->objectName();
+	return true;
+}
+
+bool PTZControls::websocketSetPreset(int preset_id,
+				      QString &device_name_out,
+				      QString &error_out)
+{
+	PTZDevice *ptz = currCamera();
+	if (!ptz) {
+		error_out = "No PTZ device selected";
+		return false;
+	}
+
+	QAbstractListModel *preset_model = ptz->presetModel();
+	if (!preset_model) {
+		error_out = "Preset model not available";
+		return false;
+	}
+
+	// Validate preset ID
+	int count = preset_model->rowCount();
+	if (preset_id < 0 || preset_id >= count) {
+		error_out = QString("Invalid preset ID: %1 (valid range: 0-%2)")
+				    .arg(preset_id)
+				    .arg(count - 1);
+		return false;
+	}
+
+	// Save current position to the preset
+	ptz->memory_set(preset_id);
+	device_name_out = ptz->objectName();
+	return true;
+}
+#endif
+
 PTZDeviceListDelegate::PTZDeviceListDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
 
 QSize PTZDeviceListDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
